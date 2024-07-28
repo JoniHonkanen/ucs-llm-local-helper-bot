@@ -12,7 +12,7 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 
 # own imports
 from tools import list_tables, describe_table
-from agents.agents import query_generator_agent, run_query_agent, revise_results_agent
+from agents.agents import query_generator_agent, run_query_agent, revise_results_agent, web_search_agent
 from llm_models import get_ollama_llm, get_openai_llm
 from utils import format_openai_response, format_ollama_response
 
@@ -85,6 +85,7 @@ def run_query(state):
 def revise(state):
     print("REVISE ALKAA")
     print(state)
+    web_search_agent(state, llm)
     return revise_results_agent(state, llm)
 
 

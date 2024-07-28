@@ -2,7 +2,10 @@ import json
 import chainlit as cl
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, AIMessage
-from schemas import CreateDatabaseQyerySchema, AfterQuerySchema, AfterQuerySchema2
+from langchain_community.tools.tavily_search import TavilySearchResults
+
+# own imports
+from schemas import CreateDatabaseQyerySchema, AfterQuerySchema
 from tools.sql import run_query_tool
 from prompts import create_prompt_template, run_query_prompt_template
 
@@ -47,9 +50,9 @@ async def query_generator_agent(state, tables, table_descriptions, llm):
 # Agent to run the generated database query - run_query
 def run_query_agent(state, table_descriptions, llm):
     print("RUN QUERY AGENT")
-    #first message from user
-    #second message is sytem message wich describe the tables
-    #then tool message which contains the query + other info
+    # first message from user
+    # second message is sytem message wich describe the tables
+    # then tool message which contains the query + other info
     messages = state["messages"][2].content
     # Parse the JSON content
     tool_message_data = json.loads(messages)
@@ -86,3 +89,11 @@ def revise_results_agent(state, llm):
     print("REVISE AGENT")
     print(state)
     return state
+
+
+def web_search_agent(state, llm):
+    print("------------WEB SEARCH AGENT---------------")
+    # create web search tool using tavily_search
+    search_tool = TavilySearchResults(max_results=5)
+    search_results = search_tool.invoke("What is bengalcat")
+    print(search_results)

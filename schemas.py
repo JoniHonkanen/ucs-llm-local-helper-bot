@@ -22,6 +22,10 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 }
 """
 
+# Reflection schema    
+class Reflection(BaseModel):
+    missing: str = Field(description="Critique of what is missing.")
+    superfluous: str = Field(description="Critique of what is superfluous.") #superfluous -> unnecessary information
 
 class SearchedItem(BaseModel):
     name: str = Field(description="The name of the item")
@@ -44,13 +48,10 @@ class AfterQuerySchema(BaseModel):
     )
     require_more_info: str = Field("Do you require more information? Yes/No")
     
-class AfterQuerySchema2(BaseModel):
-    formatted_response: str = Field(description="""Your formatted response should include:
-- A clear and concise table displaying key data points
-- Use of markdown or other suitable formatting for readability
-- Use real table names and column names where possible
 
-Use markdown to format the table / answers.""")
-    info: str = Field(description="The information after running the query")
-    result: str = Field(description="The search result for the answer")
-    require_more_info: bool = Field(description="Are you satisfied with the result? Answer as boolean")
+class WebSearchSchema(BaseModel):
+    answer: str = Field(description="The answer to the question.")
+    reflection: Reflection = Field(description="Your reflection on the initial answer.")
+    search_queries: List[str] = Field(
+        description="1-3 search queries to research information and improve your answer."
+    )

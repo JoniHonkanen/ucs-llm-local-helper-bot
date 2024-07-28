@@ -6,6 +6,23 @@ Build a demo chatbot that can be asked which product name is compatible with the
 
 A helper, which with a small modification can be made to comment on compatibilities based on database searches. To be presented to GPT Lab and business partners.
 
+## Installation
+
+1. start venv -> .\.venv\Scripts\activate
+2. install packages -> pip install -r requirements.txt
+3. create .env file with own keys for openai and tavily
+   1. OPENAI_API_KEY
+   2. TAVILY_API_KEY
+4. start program (with chainlit) -> chainlit run main.py
+
+### Nice to know
+
+Here is used/tested Ollama models, so if you want to test with local LLM, some of these need to be installed:
+"llama3"
+"zephyr"
+"gemma:2b"
+"llava"
+
 ## Requiremets for the project
 
 1. Chat styled UI, where it is possible to search items
@@ -21,3 +38,4 @@ A helper, which with a small modification can be made to comment on compatibilit
 
 1. Man-in-the-Middle, so after fulfilled first requirements, results can be changed
 2. Cusomized UI for specific usecases
+3. Get list of used Ollama models
