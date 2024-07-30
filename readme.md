@@ -34,6 +34,9 @@ Here is used/tested Ollama models, so if you want to test with local LLM, some o
    2. Memory for the agent
 6. Local LLM
 
+## Storyboard
+![A chatbot that can be asked which product name is compatible witht the identifier of an item](./images/graphs/chatbot_idea5_a4.png)
+
 ## After first requirements, some nice to have featerus would be
 
 1. Man-in-the-Middle, so after fulfilled first requirements, results can be changed
