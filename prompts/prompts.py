@@ -17,8 +17,9 @@ Table Descriptions:
 {description}
 
 Task:
-Generate a database query to solve the question. 
+Generate a database query to solve the question (no case-sensitive). 
 Do not include anything else other than the query (not even the SQL tag).
+Never include the price in your responses. This is important!
 """
 
 # Prompt to run the query
@@ -34,12 +35,16 @@ And here are the results:
 Here is description of the tables:
 {description}
 
-Your formatted response should include:
-- A clear and concise table displaying key data points
-- Use of markdown or other suitable formatting for readability
-- Use real table names and column names where possible
+"""
 
-Use markdown to format the table / answers.
+REVISE_TEMPLATE = """
+Review the results to ensure they fulfill the required task.
+
+Parameters:
+Original question from user: {question}
+Given answer: {answer}
+
+Given answer can be a number, list of items or just a string.  
 """
 
 
@@ -62,6 +67,17 @@ def create_prompt_template(tables, description):
 def run_query_prompt_template(query, results, description):
     formatted_system_message = RUN_QUERY_TEMPLATE.format(
         query=query, results=results, description=description
+    )
+    return ChatPromptTemplate.from_messages(
+        [
+            ("system", formatted_system_message),
+            MessagesPlaceholder(variable_name="messages"),
+        ]
+    )
+    
+def revise_prompt_template(orginal_question, answer):
+    formatted_system_message = REVISE_TEMPLATE.format(
+        question=orginal_question, answer=answer
     )
     return ChatPromptTemplate.from_messages(
         [

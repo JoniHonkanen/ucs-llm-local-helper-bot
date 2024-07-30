@@ -4,15 +4,26 @@ import chainlit as cl
 from chainlit.input_widget import Select
 from dotenv import load_dotenv
 from typing import Annotated, Sequence, TypedDict
-from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage, SystemMessage
+from langchain_core.messages import (
+    BaseMessage,
+    HumanMessage,
+    ToolMessage,
+    SystemMessage,
+)
 from langgraph.graph import END, StateGraph
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langchain_core.pydantic_v1 import BaseModel, Field
+import json
 
 # own imports
 from tools import list_tables, describe_table
-from agents.agents import query_generator_agent, run_query_agent, revise_results_agent, web_search_agent
+from agents.agents import (
+    query_generator_agent,
+    run_query_agent,
+    revise_results_agent,
+    web_search_agent,
+)
 from llm_models import get_ollama_llm, get_openai_llm
 from utils import format_openai_response, format_ollama_response
 
@@ -67,26 +78,30 @@ async def on_settings_update(settings):
 # State
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
-    #messages: Sequence[BaseMessage] THIS COULD BE BETTER - SO MAYBE CHANGE TO IT
+    # messages: Sequence[BaseMessage] THIS COULD BE BETTER - SO MAYBE CHANGE TO IT
 
 
 workflow = StateGraph(AgentState)
 
 
+# this is the first function to call, it generates a database query based on the user input
 def create_query(state):
     print("CREATE QUERY ALKAA")
     return asyncio.run(query_generator_agent(state, tables, table_descriptions, llm))
 
 
+# this function runs the query and returns the results
 def run_query(state):
     print("RUN QUERY ALKAA")
     return run_query_agent(state, table_descriptions, llm)
 
+
+# this function revises the result and uses conditional edges to determine if task should be repeated with new input
 def revise(state):
     print("REVISE ALKAA")
-    print(state)
-    web_search_agent(state, llm)
     return revise_results_agent(state, llm)
+    # web_search_agent(state, llm)
+    # return revise_results_agent(state, llm)
 
 
 # Nodes
@@ -100,17 +115,22 @@ workflow.add_edge("query", "revise")
 
 
 def event_loop(state):
-    print("EVENT LOOP")
+    print("******EVENT LOOP*******")
     print(state)
-    """ count_tool_visits = sum(isinstance(item, ToolMessage) for item in state)
-    num_iterations = count_tool_visits """
+    #check from the state if user question was fulfilled
+    print("\nFULFILLED?  ")
+    # Extracting the "done" part from the last message
+    last_message_content = state['messages'][-1].content
+    fulfilled = json.loads(last_message_content)['done']
+    print("ONKO VALMIS VAI EI?")
+    print(fulfilled)
     if 1 < 2:
+        print("RETURN END!!!")
         return END  # This returns the END constant, which signifies the end of the graph processing.
-    return "query" 
+    return "query"
 
 
 workflow.add_conditional_edges("revise", event_loop)
-
 
 
 # Initialize memory to persist state between graph runs
@@ -137,29 +157,31 @@ async def run_convo(message: cl.Message):
     # Add the new human message to the state
     cl.user_session.state["messages"].append(HumanMessage(content=message.content))
     cl.user_session.state["messages"].append(SystemMessage(content=table_descriptions))
-     
-    #inputs = {"messages": [HumanMessage(content=message.content)]}
-    
 
-    
+    # inputs = {"messages": [HumanMessage(content=message.content)]}
 
     res = graph.invoke(
-        #inputs,
+        # inputs,
         cl.user_session.state,
         config=RunnableConfig(
             callbacks=[cl.LangchainCallbackHandler()],
         ),
         debug=True,
     )
-    #res comes after when whole graph is done
+    # res comes after when whole graph is done
     print("RES", res)
-    
-    response_message = res["messages"][-1].content
+
+    #response_message = res["messages"][-1].content
+    #Last message with formatted response
+    response_message2 = json.loads(res["messages"][-2].content)['formatted_response']
 
     # Openai and Ollama have different response formats, so we need to format them differently
     if llm_choice == "OpenAI":
-        formatted_response = format_openai_response(response_message)
+        formatted_response = format_openai_response(response_message2)
     else:
-        formatted_response = format_ollama_response(response_message)
+        formatted_response = format_ollama_response(response_message2)
 
     await cl.Message(formatted_response).send()
+
+    # reset state
+    cl.user_session.state = AgentState(messages=[])

@@ -14,3 +14,12 @@ def format_openai_response(response):
         formatted_response = str(response)
     return formatted_response
 
+# Format the query results (used in agents.py)
+def format_query_results(results):
+    print("format_query_results")
+    if not results:
+        return "No results found."
+    elif len(results) == 1 and isinstance(results[0], tuple) and len(results[0]) == 1:
+        return f"Query Result: {results[0][0]}"
+    else:
+        return "\n".join([str(row) for row in results])
