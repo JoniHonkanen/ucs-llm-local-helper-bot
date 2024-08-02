@@ -1,5 +1,5 @@
 from typing import List
-from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_core.pydantic_v1 import BaseModel, Field, Extra, validator
 
 # Schema - define the structure of the answer to the question
 # Example answer:
@@ -24,8 +24,10 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 
 
 # Schema used for creating the database query
-class CreateDatabaseQyerySchema(BaseModel):
-    query: str = Field(description="Used database query without anything else")
+class CreateDatabaseQuerySchema(BaseModel):
+    query: str = Field(
+        description="Used database query without anything else. Remember, newer show prices or other sensitive information in the query"
+    )
     info: str = Field(description="Why the query was used")
     is_correct: str = Field(
         description="Does this answer the question correctly? Yes/No"
@@ -54,6 +56,9 @@ Use markdown to format the table / answers. """
     )
     response: str = Field(description="Just the straigt response from the database")
 
+    class Config:
+        extra = Extra.forbid  # Forbid extra fields not defined in the model
+
 
 # Reflection schema
 class ReflectionSchema(BaseModel):
@@ -63,6 +68,24 @@ class ReflectionSchema(BaseModel):
     reflect: str = Field(
         description="Why the answer fulfills / does not fulfill the question"
     )
+    suggestions: str = Field(
+        description="Suggestions for how the query or answer can be improved",
+        default="",
+    )
+    missing_aspects: str = Field(
+        description="Specific aspects or information that are missing or could be better addressed",
+        default="",
+    )
+    relevance: float = Field(
+        description="A score from 0 to 1 indicating the relevance of the answer to the original question"
+    )
+
+    # Set the optional fields to empty string if the done field is True
+    @validator("suggestions", "missing_aspects", pre=True, always=True)
+    def set_optional_fields(cls, v, values, field):
+        if values.get("done", False):
+            return ""
+        return v
 
 
 # SCHEMAS FROM BELOW NOT USED YET...
@@ -84,9 +107,6 @@ class SearchedItem(BaseModel):
 
 class WebSearchSchema(BaseModel):
     answer: str = Field(description="The answer to the question.")
-    reflection: ReflectionSchema = Field(
-        description="Your reflection on the initial answer."
-    )
     search_queries: List[str] = Field(
         description="1-3 search queries to research information and improve your answer."
     )

@@ -3,18 +3,29 @@ import chainlit as cl
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, AIMessage
 from langchain_community.tools.tavily_search import TavilySearchResults
 
+# from langchain_core.output_parsers import JsonOutputParser, PydanticOutputParser
 # own imports
-from schemas import CreateDatabaseQyerySchema, AfterQuerySchema, ReflectionSchema
+from schemas import (
+    CreateDatabaseQuerySchema,
+    AfterQuerySchema,
+    ReflectionSchema,
+    WebSearchSchema,
+)
 from tools.sql import run_query_tool
 from prompts import (
     create_prompt_template,
     run_query_prompt_template,
     revise_prompt_template,
+    rag_web_search_prompt_template,
 )
 from utils import format_query_results
 
 # Initialize the language model
 # llm = ChatOpenAI(model="gpt-4o-mini")
+
+# TODO: Use parsers ??
+# parser = JsonOutputParser(return_id=True)
+# parser_pydantic = PydanticOutputParser(tools=[CreateDatabaseQuerySchema],type="CreateDatabaseQuerySchema")
 
 
 # Agent to generate a query - create_query
@@ -24,13 +35,11 @@ async def query_generator_agent(state, tables, table_descriptions, llm):
     # Create the prompt template with table descriptions
     prompt_template = create_prompt_template(tables, table_descriptions)
     # Format messages using the prompt template
-    # Extract message content
-    messages_content = [msg.content for msg in messages]
-    formatted_messages = prompt_template.format(messages=messages_content)
+    formatted_messages = prompt_template.format(messages=messages)
 
     # Call the language model using tool which is defined in schemas.py
     llm_call = llm.bind_tools(
-        tools=[CreateDatabaseQyerySchema], tool_choice="CreateDatabaseQyerySchema"
+        tools=[CreateDatabaseQuerySchema], tool_choice="CreateDatabaseQuerySchema"
     )
     response = llm_call.invoke(formatted_messages)
 
@@ -54,10 +63,8 @@ async def query_generator_agent(state, tables, table_descriptions, llm):
 # Agent to run the generated database query - run_query
 def run_query_agent(state, table_descriptions, llm):
     print("--------RUN QUERY AGENT------------")
-    # first message from user
     # second message is sytem message wich describe the tables
     # then tool message which contains the query + other info
-    print(state["messages"])
     messages = state["messages"][2].content
     # Parse the JSON content
     tool_message_data = json.loads(messages)
@@ -71,10 +78,7 @@ def run_query_agent(state, table_descriptions, llm):
         query, formatted_results, table_descriptions
     )
 
-    # TÄÄ VARMAAN TURHA... KATO MITÄ MESSAGES KOHTAAN TULEE
-    messages_content = state["messages"][0].content
-    formatted_messages = prompt_template.format(messages=[messages_content])
-    # llm_call = llm.invoke(formatted_messages)
+    formatted_messages = prompt_template.format(messages=state["messages"])
 
     llm_call = llm.bind_tools(tools=[AfterQuerySchema], tool_choice="AfterQuerySchema")
     response = llm_call.invoke(formatted_messages)
@@ -82,9 +86,6 @@ def run_query_agent(state, table_descriptions, llm):
     # Extract the generated query and info
     tool_call_args = response.tool_calls[0]["args"]
     tool_call_id = response.tool_calls[0]["id"]
-
-    # markdown = tool_call_args["formatted_response"]
-    # response1 = tool_call_args["response"]
 
     return {
         "messages": [
@@ -105,9 +106,8 @@ def revise_results_agent(state, llm):
     prompt_template = revise_prompt_template(
         orginal_question, revised_answer["response"]
     )
-    # TÄÄ VARMAAN TURHA... KATO MITÄ MESSAGES KOHTAAN TULEE
-    messages_content = state["messages"][0].content
-    formatted_messages = prompt_template.format(messages=[messages_content])
+
+    formatted_messages = prompt_template.format(messages=state["messages"])
 
     llm_call = llm.bind_tools(tools=[ReflectionSchema], tool_choice="ReflectionSchema")
     response = llm_call.invoke(formatted_messages)
@@ -125,7 +125,25 @@ def revise_results_agent(state, llm):
 
 def web_search_agent(state, llm):
     print("------------WEB SEARCH AGENT---------------")
+    orginal_question = state["messages"][0].content
+    lastMessage = state["messages"][-1].content
+    lastMessageParsed = json.loads(lastMessage)
+    print("LAST MESSAGE: ", lastMessage)
+    print("LAST MESSAGE PARSED: ", lastMessageParsed)
+    reflect = lastMessageParsed["reflect"]
+    suggestions = lastMessageParsed["suggestions"]
+    missing_aspects = lastMessageParsed["missing_aspects"]
+
+    prompt_template = rag_web_search_prompt_template(
+        orginal_question, reflect, suggestions, missing_aspects
+    )
+
+    formatted_messages = prompt_template.format(messages=state["messages"])
+    llm_call = llm.bind_tools(tools=[WebSearchSchema], tool_choice="WebSearchSchema")
+    response = llm_call.invoke(formatted_messages)
+    print("RESPONSE: ", response)
+    web_search = response.tool_calls[0]["args"]["answer"]
     # create web search tool using tavily_search
-    search_tool = TavilySearchResults(max_results=5)
-    search_results = search_tool.invoke("What is bengalcat")
+    search_tool = TavilySearchResults(max_results=1)
+    search_results = search_tool.invoke(web_search)
     print(search_results)

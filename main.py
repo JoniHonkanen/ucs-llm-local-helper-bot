@@ -100,14 +100,17 @@ def run_query(state):
 def revise(state):
     print("REVISE ALKAA")
     return revise_results_agent(state, llm)
-    # web_search_agent(state, llm)
-    # return revise_results_agent(state, llm)
+
+def web_search(state):
+    print("WEB SEARCH ALKAA")
+    return web_search_agent(state, llm)
 
 
 # Nodes
 workflow.add_node("analyze", create_query)
 workflow.add_node("query", run_query)
 workflow.add_node("revise", revise)
+workflow.add_node("web_search", web_search)
 workflow.set_entry_point("analyze")
 # Edges
 workflow.add_edge("analyze", "query")
@@ -117,17 +120,18 @@ workflow.add_edge("query", "revise")
 def event_loop(state):
     print("******EVENT LOOP*******")
     print(state)
-    #check from the state if user question was fulfilled
-    print("\nFULFILLED?  ")
+    count_tool_visits = sum(isinstance(item, ToolMessage) for item in state["messages"])
+    print("COUNT TOOL VISITS: ", count_tool_visits)
     # Extracting the "done" part from the last message
     last_message_content = state['messages'][-1].content
     fulfilled = json.loads(last_message_content)['done']
-    print("ONKO VALMIS VAI EI?")
-    print(fulfilled)
-    if 1 < 2:
-        print("RETURN END!!!")
-        return END  # This returns the END constant, which signifies the end of the graph processing.
-    return "query"
+    print("FULFILLED: ", fulfilled)
+
+    if fulfilled:
+        return END
+    else:
+        cl.user_session.state["messages"].append(SystemMessage(content="Lets search from web"))
+        return "web_search"
 
 
 workflow.add_conditional_edges("revise", event_loop)
