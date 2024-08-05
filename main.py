@@ -1,7 +1,7 @@
 import asyncio
 import operator
 import chainlit as cl
-from chainlit.input_widget import Select
+from chainlit.input_widget import Select, Switch
 from dotenv import load_dotenv
 from typing import Annotated, Sequence, TypedDict
 from langchain_core.messages import (
@@ -52,6 +52,11 @@ async def on_chat_start():
     # TODO: use ollama-python to get the list of available models and display them in the select widget -> ollama.list()
     await cl.ChatSettings(
         [
+            Switch(
+                id="rag_internet",
+                label="Allow complete responses by using web searches",
+                initial=True,
+            ),
             Select(
                 id="llm",
                 label="Select the server you want to use:",
@@ -63,16 +68,22 @@ async def on_chat_start():
                     "Ollama - llava",
                 ],
                 initial_index=0,
-            )
+            ),
         ]
     ).send()
+
     await cl.Message(content="Hello! How can I assist you today 🤖").send()
 
 
 @cl.on_settings_update
 async def on_settings_update(settings):
+    # Update the llm_choice setting
     llm_choice = settings["llm"]
     cl.user_session.set("llm_choice", llm_choice)
+
+    # Update the allow_web_search setting
+    allow_web_search = settings["rag_internet"]
+    cl.user_session.set("allow_web_search", allow_web_search)
 
 
 # State
@@ -101,6 +112,7 @@ def revise(state):
     print("REVISE ALKAA")
     return revise_results_agent(state, llm)
 
+
 def web_search(state):
     print("WEB SEARCH ALKAA")
     return web_search_agent(state, llm)
@@ -123,14 +135,16 @@ def event_loop(state):
     count_tool_visits = sum(isinstance(item, ToolMessage) for item in state["messages"])
     print("COUNT TOOL VISITS: ", count_tool_visits)
     # Extracting the "done" part from the last message
-    last_message_content = state['messages'][-1].content
-    fulfilled = json.loads(last_message_content)['done']
+    last_message_content = state["messages"][-1].content
+    fulfilled = json.loads(last_message_content)["done"]
     print("FULFILLED: ", fulfilled)
 
     if fulfilled:
         return END
     else:
-        cl.user_session.state["messages"].append(SystemMessage(content="Lets search from web"))
+        cl.user_session.state["messages"].append(
+            SystemMessage(content="Lets search from web")
+        )
         return "web_search"
 
 
@@ -175,9 +189,9 @@ async def run_convo(message: cl.Message):
     # res comes after when whole graph is done
     print("RES", res)
 
-    #response_message = res["messages"][-1].content
-    #Last message with formatted response
-    response_message2 = json.loads(res["messages"][-2].content)['formatted_response']
+    # response_message = res["messages"][-1].content
+    # Last message with formatted response
+    response_message2 = json.loads(res["messages"][-2].content)["formatted_response"]
 
     # Openai and Ollama have different response formats, so we need to format them differently
     if llm_choice == "OpenAI":
