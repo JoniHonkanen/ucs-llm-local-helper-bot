@@ -12,8 +12,6 @@ from langchain_core.messages import (
 )
 from langgraph.graph import END, StateGraph
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
-from langchain_core.pydantic_v1 import BaseModel, Field
 import json
 
 # own imports
@@ -33,6 +31,7 @@ load_dotenv()
 # Initialize global LLM variable
 # llm can be either Ollama or OpenAI
 llm = get_openai_llm()
+rounds = 0
 
 
 # Initialize database information
@@ -96,26 +95,28 @@ workflow = StateGraph(AgentState)
 
 
 # this is the first function to call, it generates a database query based on the user input
-def create_query(state):
+async def create_query(state):
     print("CREATE QUERY ALKAA")
-    return asyncio.run(query_generator_agent(state, tables, table_descriptions, llm))
+    return await query_generator_agent(state, tables, table_descriptions, llm)
 
 
 # this function runs the query and returns the results
-def run_query(state):
+async def run_query(state):
     print("RUN QUERY ALKAA")
-    return run_query_agent(state, table_descriptions, llm)
+    return await run_query_agent(state, table_descriptions, llm)
 
 
 # this function revises the result and uses conditional edges to determine if task should be repeated with new input
-def revise(state):
+async def revise(state):
     print("REVISE ALKAA")
-    return revise_results_agent(state, llm)
+    global rounds
+    rounds += 1
+    return await revise_results_agent(state, llm)
 
 
-def web_search(state):
+async def web_search(state):
     print("WEB SEARCH ALKAA")
-    return web_search_agent(state, llm)
+    return await web_search_agent(state, llm)
 
 
 # Nodes
@@ -123,32 +124,32 @@ workflow.add_node("analyze", create_query)
 workflow.add_node("query", run_query)
 workflow.add_node("revise", revise)
 workflow.add_node("web_search", web_search)
-workflow.set_entry_point("analyze")
+
 # Edges
 workflow.add_edge("analyze", "query")
 workflow.add_edge("query", "revise")
+workflow.add_edge("web_search", "analyze")
 
 
-def event_loop(state):
-    print("******EVENT LOOP*******")
-    print(state)
-    count_tool_visits = sum(isinstance(item, ToolMessage) for item in state["messages"])
-    print("COUNT TOOL VISITS: ", count_tool_visits)
+def is_done(state):
+    print("******IS DONE*******")
+
+    # count_tool_visits = sum(isinstance(item, ToolMessage) for item in state["messages"])
+    # print("COUNT TOOL VISITS: ", count_tool_visits)
+
     # Extracting the "done" part from the last message
     last_message_content = state["messages"][-1].content
     fulfilled = json.loads(last_message_content)["done"]
     print("FULFILLED: ", fulfilled)
+    print(rounds)
 
-    if fulfilled:
-        return END
-    else:
-        cl.user_session.state["messages"].append(
-            SystemMessage(content="Lets search from web")
-        )
-        return "web_search"
+    if fulfilled or rounds > 1:
+        return "END"
+    return "web_search"
 
 
-workflow.add_conditional_edges("revise", event_loop)
+workflow.add_conditional_edges("revise", is_done)
+workflow.set_entry_point("analyze")
 
 
 # Initialize memory to persist state between graph runs
@@ -173,12 +174,12 @@ async def run_convo(message: cl.Message):
         cl.user_session.state = AgentState(messages=[])
 
     # Add the new human message to the state
-    cl.user_session.state["messages"].append(HumanMessage(content=message.content))
     cl.user_session.state["messages"].append(SystemMessage(content=table_descriptions))
+    cl.user_session.state["messages"].append(HumanMessage(content=message.content))
 
     # inputs = {"messages": [HumanMessage(content=message.content)]}
 
-    res = graph.invoke(
+    res = await graph.ainvoke(
         # inputs,
         cl.user_session.state,
         config=RunnableConfig(
@@ -202,4 +203,6 @@ async def run_convo(message: cl.Message):
     await cl.Message(formatted_response).send()
 
     # reset state
+    global rounds
+    rounds = 0
     cl.user_session.state = AgentState(messages=[])

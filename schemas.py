@@ -106,7 +106,7 @@ class SearchedItem(BaseModel):
 
 
 class WebSearchSchema(BaseModel):
-    answer: str = Field(description="The answer to the question.")
-    search_queries: List[str] = Field(
-        description="1-3 search queries to research information and improve your answer."
-    )
+    web_search: str = Field(description="Generated web search query")
+    #search_queries: List[str] = Field(
+    #    description="1-3 search queries to research information and improve your answer."
+    #)

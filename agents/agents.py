@@ -27,15 +27,16 @@ from utils import format_query_results
 # parser = JsonOutputParser(return_id=True)
 # parser_pydantic = PydanticOutputParser(tools=[CreateDatabaseQuerySchema],type="CreateDatabaseQuerySchema")
 
-
 # Agent to generate a query - create_query
 async def query_generator_agent(state, tables, table_descriptions, llm):
     print("--------QUERY GENERATOR AGENT------------")
-    messages = state["messages"]
+    # messages = state["messages"]
+    messages = state["messages"][-1]
+    print("MESSAGES: ", messages)
     # Create the prompt template with table descriptions
     prompt_template = create_prompt_template(tables, table_descriptions)
     # Format messages using the prompt template
-    formatted_messages = prompt_template.format(messages=messages)
+    formatted_messages = prompt_template.format(messages=[messages])
 
     # Call the language model using tool which is defined in schemas.py
     llm_call = llm.bind_tools(
@@ -61,7 +62,7 @@ async def query_generator_agent(state, tables, table_descriptions, llm):
 
 
 # Agent to run the generated database query - run_query
-def run_query_agent(state, table_descriptions, llm):
+async def run_query_agent(state, table_descriptions, llm):
     print("--------RUN QUERY AGENT------------")
     # second message is sytem message wich describe the tables
     # then tool message which contains the query + other info
@@ -86,6 +87,8 @@ def run_query_agent(state, table_descriptions, llm):
     # Extract the generated query and info
     tool_call_args = response.tool_calls[0]["args"]
     tool_call_id = response.tool_calls[0]["id"]
+    
+    await cl.Message(content="Query executed successfully.").send()
 
     return {
         "messages": [
@@ -97,7 +100,7 @@ def run_query_agent(state, table_descriptions, llm):
 
 
 # Agent to revise the generated query - revise
-def revise_results_agent(state, llm):
+async def revise_results_agent(state, llm):
     print("\n--------REVISE AGENT------------")
     orginal_question = state["messages"][0].content
     mes2 = state["messages"][-1].content
@@ -123,7 +126,7 @@ def revise_results_agent(state, llm):
     }
 
 
-def web_search_agent(state, llm):
+async def web_search_agent(state, llm):
     print("------------WEB SEARCH AGENT---------------")
     orginal_question = state["messages"][0].content
     lastMessage = state["messages"][-1].content
@@ -141,9 +144,17 @@ def web_search_agent(state, llm):
     formatted_messages = prompt_template.format(messages=state["messages"])
     llm_call = llm.bind_tools(tools=[WebSearchSchema], tool_choice="WebSearchSchema")
     response = llm_call.invoke(formatted_messages)
-    print("RESPONSE: ", response)
-    web_search = response.tool_calls[0]["args"]["answer"]
+
+    # Extract the generated query and info
+    tool_call_args = response.tool_calls[0]["args"]
+    tool_call_id = response.tool_calls[0]["id"]
+    tool_response = ToolMessage(
+        content=json.dumps(tool_call_args), tool_call_id=tool_call_id
+    )
+    web_search = response.tool_calls[0]["args"]["web_search"]
     # create web search tool using tavily_search
+
     search_tool = TavilySearchResults(max_results=1)
     search_results = search_tool.invoke(web_search)
-    print(search_results)
+    #TODO: CHECK THAT tool_response and AI message are correct
+    return {"messages": [tool_response, AIMessage(content=search_results[0]["content"])]}

@@ -62,6 +62,9 @@ Suggestions: These are alternative suggestions or advice that might help the use
 
 Missing Aspects: These are aspects that are missing from the initial response, which could help make the response more complete and helpful: {missing_aspects}
 
+Task:
+Generate a short and descriptive text for a web search, based on the previous sections.
+
 """
 
 
