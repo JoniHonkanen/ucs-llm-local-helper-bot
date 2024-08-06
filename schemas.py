@@ -86,15 +86,21 @@ class ReflectionSchema(BaseModel):
         if values.get("done", False):
             return ""
         return v
+    
+class WebSearchSchema(BaseModel):
+    web_search: str = Field(description="Result of the web search")
+    #search_queries: List[str] = Field(
+    #    description="1-3 search queries to research information and improve your answer."
+    #)
 
 
 # SCHEMAS FROM BELOW NOT USED YET...
 
 
-class SearchedItem(BaseModel):
+""" class SearchedItem(BaseModel):
     name: str = Field(description="The name of the item")
     quantity: int = Field(description="The quantity of the searched result")
-    info: str = Field(description="The information of the searched ")
+    info: str = Field(description="The information of the searched ") """
 
 
 """ class AfterQuerySchema(BaseModel):
@@ -104,9 +110,3 @@ class SearchedItem(BaseModel):
     )
     require_more_info: str = Field("Do you require more information? Yes/No") """
 
-
-class WebSearchSchema(BaseModel):
-    web_search: str = Field(description="Generated web search query")
-    #search_queries: List[str] = Field(
-    #    description="1-3 search queries to research information and improve your answer."
-    #)

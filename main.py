@@ -1,4 +1,3 @@
-import asyncio
 import operator
 import chainlit as cl
 from chainlit.input_widget import Select, Switch
@@ -76,13 +75,11 @@ async def on_chat_start():
 
 @cl.on_settings_update
 async def on_settings_update(settings):
-    # Update the llm_choice setting
-    llm_choice = settings["llm"]
-    cl.user_session.set("llm_choice", llm_choice)
-
-    # Update the allow_web_search setting
-    allow_web_search = settings["rag_internet"]
-    cl.user_session.set("allow_web_search", allow_web_search)
+    # Update the LLM choice
+    cl.user_session.set("llm_choice", settings["llm"])
+    # Enable or disable web search
+    #TODO: NOT IMPLEMENTED YET
+    cl.user_session.set("allow_web_search", settings["rag_internet"])
 
 
 # State
@@ -94,28 +91,26 @@ class AgentState(TypedDict):
 workflow = StateGraph(AgentState)
 
 
-# this is the first function to call, it generates a database query based on the user input
+# Define node functions
 async def create_query(state):
-    print("CREATE QUERY ALKAA")
+    print("\nCREATE QUERY ALKAA")
     return await query_generator_agent(state, tables, table_descriptions, llm)
 
 
-# this function runs the query and returns the results
 async def run_query(state):
-    print("RUN QUERY ALKAA")
+    print("\nRUN QUERY ALKAA")
     return await run_query_agent(state, table_descriptions, llm)
 
 
-# this function revises the result and uses conditional edges to determine if task should be repeated with new input
 async def revise(state):
-    print("REVISE ALKAA")
+    print("\nREVISE ALKAA")
     global rounds
     rounds += 1
     return await revise_results_agent(state, llm)
 
 
 async def web_search(state):
-    print("WEB SEARCH ALKAA")
+    print("\nWEB SEARCH ALKAA")
     return await web_search_agent(state, llm)
 
 
@@ -132,16 +127,12 @@ workflow.add_edge("web_search", "analyze")
 
 
 def is_done(state):
-    print("******IS DONE*******")
-
     # count_tool_visits = sum(isinstance(item, ToolMessage) for item in state["messages"])
     # print("COUNT TOOL VISITS: ", count_tool_visits)
 
     # Extracting the "done" part from the last message
     last_message_content = state["messages"][-1].content
     fulfilled = json.loads(last_message_content)["done"]
-    print("FULFILLED: ", fulfilled)
-    print(rounds)
 
     if fulfilled or rounds > 1:
         return "END"
@@ -159,7 +150,7 @@ graph.get_graph().draw_mermaid_png(output_file_path="images/graphs/chainlit_grap
 
 @cl.on_message
 async def run_convo(message: cl.Message):
-    print("********ON MESSAGE**********")
+    print("\n********ON MESSAGE**********")
     # LLM to use
     global llm
     llm_choice = cl.user_session.get("llm_choice", "OpenAI")
@@ -188,17 +179,17 @@ async def run_convo(message: cl.Message):
         debug=True,
     )
     # res comes after when whole graph is done
-    print("RES", res)
+    print("\nRES: ", res)
 
     # response_message = res["messages"][-1].content
-    # Last message with formatted response
-    response_message2 = json.loads(res["messages"][-2].content)["formatted_response"]
+    # Last message with formatted response - THIS IS THE MARKDOWN TABLE
+    response_message_markdown = json.loads(res["messages"][-2].content)["formatted_response"]
 
     # Openai and Ollama have different response formats, so we need to format them differently
     if llm_choice == "OpenAI":
-        formatted_response = format_openai_response(response_message2)
+        formatted_response = format_openai_response(response_message_markdown)
     else:
-        formatted_response = format_ollama_response(response_message2)
+        formatted_response = format_ollama_response(response_message_markdown)
 
     await cl.Message(formatted_response).send()
 
@@ -206,3 +197,4 @@ async def run_convo(message: cl.Message):
     global rounds
     rounds = 0
     cl.user_session.state = AgentState(messages=[])
+    print("\nDONE\n\n\n")
