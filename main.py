@@ -12,6 +12,7 @@ from langchain_core.messages import (
 from langgraph.graph import END, StateGraph
 from langchain_core.runnables import RunnableConfig
 import json
+from pprint import pprint
 
 # own imports
 from tools import list_tables, describe_table
@@ -78,7 +79,7 @@ async def on_settings_update(settings):
     # Update the LLM choice
     cl.user_session.set("llm_choice", settings["llm"])
     # Enable or disable web search
-    #TODO: NOT IMPLEMENTED YET
+    # TODO: NOT IMPLEMENTED YET
     cl.user_session.set("allow_web_search", settings["rag_internet"])
 
 
@@ -177,13 +178,15 @@ async def run_convo(message: cl.Message):
             callbacks=[cl.LangchainCallbackHandler()],
         ),
         debug=True,
+        # stream_mode="values"
     )
     # res comes after when whole graph is done
-    print("\nRES: ", res)
+    pprint(res)
 
-    # response_message = res["messages"][-1].content
     # Last message with formatted response - THIS IS THE MARKDOWN TABLE
-    response_message_markdown = json.loads(res["messages"][-2].content)["formatted_response"]
+    response_message_markdown = json.loads(res["messages"][-2].content)[
+        "formatted_response"
+    ]
 
     # Openai and Ollama have different response formats, so we need to format them differently
     if llm_choice == "OpenAI":

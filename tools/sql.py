@@ -3,22 +3,28 @@ import psycopg2
 from langchain_core.tools import Tool
 from langchain_core.pydantic_v1 import BaseModel
 from typing import List
+import configparser
 
+config = configparser.ConfigParser()
+config.read("config.ini")
+database_config = config["database"]
 # connect to local postgresql database
 conn = psycopg2.connect(
-    dbname="car_parts",
-    user="postgres",
-    password="postgres",
-    host="localhost",
-    port="5432",
+    dbname=database_config["dbname"],
+    user=database_config["user"],
+    password=database_config["password"],
+    host=database_config["host"],
+    port=database_config["port"],
 )
 
 
 # fetch all tables in the database
 def list_tables():
-    query = """
+    database_name = database_config["dbname"]
+    print(database_name)
+    query = f"""
     SELECT table_name
-    FROM  car_parts.information_schema.tables
+    FROM  {database_name}.information_schema.tables
     WHERE table_schema = 'public'
     ORDER BY table_name;
     """
@@ -51,6 +57,7 @@ run_query_tool = Tool.from_function(
     func=run_query,
     args_schema=RunQueryArgsSchema,
 )
+
 
 # describe the table
 def describe_table(table_names: List[str]):

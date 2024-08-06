@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+# Ignore configuration files
+config.ini
+
 # Distribution / packaging
 .Python
 build/
@@ -22,7 +25,8 @@ var/
 wheels/
 share/python-wheels/
 *.egg-info/
-.installed.cfg
+.installed.cfg# Ignore configuration files
+config.ini
 *.egg
 MANIFEST
 
