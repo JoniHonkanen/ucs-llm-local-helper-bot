@@ -13,7 +13,8 @@ first create venv in root of the project: python -m venv .venv
 3. create .env file with own keys for openai and tavily
    1. OPENAI_API_KEY
    2. TAVILY_API_KEY
-4. start program (with chainlit) -> chainlit run main.py
+4. create config.ini file (you can look example from config.example.ini) and fill the required parts (database information etc.)
+5. start program (with chainlit) -> chainlit run main.py
 
 ### Nice to know
 
