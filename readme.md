@@ -7,7 +7,7 @@ Build a demo chatbot that can be asked which product name is compatible with the
 A helper, which with a small modification can be made to comment on compatibilities based on database searches. To be presented to GPT Lab and business partners.
 
 ## Installation
-
+first create venv in root of the project: python -m venv .venv 
 1. start venv -> .\.venv\Scripts\activate
 2. install packages -> pip install -r requirements.txt
 3. create .env file with own keys for openai and tavily
