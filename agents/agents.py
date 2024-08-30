@@ -4,10 +4,21 @@ from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, AI
 from langchain_community.tools.tavily_search import TavilySearchResults
 
 # Own imports
-from schemas import CreateDatabaseQuerySchema, AfterQuerySchema, ReflectionSchema, WebSearchSchema
+from schemas import (
+    CreateDatabaseQuerySchema,
+    AfterQuerySchema,
+    ReflectionSchema,
+    WebSearchSchema,
+)
 from tools.sql import run_query_tool
-from prompts import create_prompt_template, run_query_prompt_template, revise_prompt_template, rag_web_search_prompt_template
+from prompts import (
+    QUERY_GENERATOR_AGENT_PROMPT,
+    RUN_DATABASE_QUERY_AGENT_PROMPT,
+    REVISE_RESULTS_AGENT_PROMPT,
+    WEB_SEARCH_AGENT_PROMPT,
+)
 from utils import format_query_results
+
 
 # Utility function to invoke LLM with bound tools and return response
 async def invoke_llm(llm, messages, tool_schema):
@@ -17,66 +28,110 @@ async def invoke_llm(llm, messages, tool_schema):
     tool_call_id = response.tool_calls[0]["id"]
     return tool_call_args, tool_call_id
 
-# Agent to generate a query - create_query
-async def query_generator_agent(state, tables, table_descriptions, llm):
-    last_message = state["messages"][-1]
-    prompt_template = create_prompt_template(tables, table_descriptions)
-    formatted_messages = prompt_template.format(messages=[last_message])
-    tool_call_args, tool_call_id = await invoke_llm(llm, formatted_messages, CreateDatabaseQuerySchema)
 
-    query = tool_call_args["query"]
-    info = tool_call_args["info"]
+async def query_generator_agent(state, tables, table_descriptions, llm):
+    print("\n**QUERY GENERATOR AGENT**")
+    last_message = state["messages"][-1]
+    structured_llm = llm.with_structured_output(CreateDatabaseQuerySchema)
+
+    prompt = QUERY_GENERATOR_AGENT_PROMPT.format(
+        tables=tables,
+        table_descriptions=table_descriptions,
+        user_input=last_message.content,
+    )
+    data = structured_llm.invoke(prompt)
+    query = data.query
+    info = data.info
 
     await cl.Message(content=info).send()
     await cl.Message(content=query, author="query", language="sql").send()
 
-    return {"messages": [ToolMessage(content=json.dumps(tool_call_args), tool_call_id=tool_call_id)]}
+    state["messages"] += [
+        AIMessage(content=f"Description of generated database query: {info}"),
+        AIMessage(content=f"Generated database query: {query}"),
+    ]
+    state["db_query"] = query
+
+    return state
+
 
 # Agent to run the generated database query - run_query
 async def run_query_agent(state, table_descriptions, llm):
-    tool_message_data = json.loads(state["messages"][2].content)
-    query = tool_message_data["query"]
+    print("\n**RUN DATABASE QUERY AGENT**")
+    query = state["db_query"]
+
+    # run the query
     results = run_query_tool.func(query)
     formatted_results = format_query_results(results)
 
-    prompt_template = run_query_prompt_template(query, formatted_results, table_descriptions)
-    formatted_messages = prompt_template.format(messages=state["messages"])
-    tool_call_args, tool_call_id = await invoke_llm(llm, formatted_messages, AfterQuerySchema)
+    structured_llm = llm.with_structured_output(AfterQuerySchema)
+
+    prompt = RUN_DATABASE_QUERY_AGENT_PROMPT.format(
+        query=query, results=formatted_results, table_descriptions=table_descriptions
+    )
+
+    data = structured_llm.invoke(prompt)
+    formatted_response = data.formatted_response
+
+    state["db_results"] = results
+    state["db_formatted_results"] = formatted_response
+    state["messages"] += [
+        AIMessage(content=f"Results from database: {results}"),
+    ]
 
     await cl.Message(content="Query executed successfully.").send()
-    return {"messages": [ToolMessage(content=json.dumps(tool_call_args), tool_call_id=tool_call_id)]}
+    return state
 
-# Agent to revise the generated query - revise
+
 async def revise_results_agent(state, llm):
-    original_question = state["messages"][0].content
-    revised_answer = json.loads(state["messages"][-1].content)["response"]
+    print("\n**REVISE RESULTS AGENT**")
+    original_question = state["user_input"]
+    db_results = state["db_results"]
+    structured_llm = llm.with_structured_output(ReflectionSchema)
 
-    prompt_template = revise_prompt_template(original_question, revised_answer)
-    formatted_messages = prompt_template.format(messages=state["messages"])
-    tool_call_args, tool_call_id = await invoke_llm(llm, formatted_messages, ReflectionSchema)
+    prompt = REVISE_RESULTS_AGENT_PROMPT.format(
+        question=original_question, answer=db_results
+    )
+    data = structured_llm.invoke(prompt)
+    done = data.done
+    reflection = data.reflect
+    state["messages"] += [
+        AIMessage(content=f"Is everything done: {done}"),
+        AIMessage(content=f"Reflection for this: {reflection}"),
+    ]
+    state["done"] = data
+    state["iterations"] += 1
 
-    return {"messages": [ToolMessage(content=json.dumps(tool_call_args), tool_call_id=tool_call_id)]}
+    return state
 
-# Agent to handle web search - web_search
+
 async def web_search_agent(state, llm):
-    original_question = state["messages"][0].content
-    last_message_data = json.loads(state["messages"][-1].content)
-    reflect = last_message_data["reflect"]
-    suggestions = last_message_data["suggestions"]
-    missing_aspects = last_message_data["missing_aspects"]
+    print("\n**WEB SEARCH AGENT**")
+    original_question = state["user_input"]
 
-    prompt_template = rag_web_search_prompt_template(original_question, reflect, suggestions, missing_aspects)
-    formatted_messages = prompt_template.format(messages=state["messages"])
-    tool_call_args, tool_call_id = await invoke_llm(llm, formatted_messages, WebSearchSchema)
+    structured_llm = llm.with_structured_output(WebSearchSchema)
 
-    web_search_query = tool_call_args["web_search"]
+    prompt = WEB_SEARCH_AGENT_PROMPT.format(
+        question=original_question,
+        reflect=state["done"].reflect,
+        suggestions=state["done"].suggestions,
+        missing_aspects=state["done"].missing_aspects,
+    )
+
+    data = structured_llm.invoke(prompt)
+
+    print(data)
+
+    web_search_query = data.web_search
     search_tool = TavilySearchResults(max_results=1)
     search_results = search_tool.invoke(web_search_query)
     search_result_content = search_results[0]["content"]
 
-    return {
-        "messages": [
-            ToolMessage(content=json.dumps(tool_call_args), tool_call_id=tool_call_id),
-            AIMessage(content=search_result_content)
-        ]
-    }
+    print(search_result_content)
+
+    # TODO: PARANNUKSIA TÄNNE
+    # search_result_content KORVAA alkuperäisen kysymyksen, jonka jälkeen luodaan tietokantakysely uudestaan jne.
+    # Tähän lopetin 30.8.2024 klo 16:45... jatka tästä
+
+    state["user_input"] = search_result_content
+    return state

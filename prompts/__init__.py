@@ -1,3 +1,13 @@
-from .prompts import create_prompt_template, run_query_prompt_template, revise_prompt_template, rag_web_search_prompt_template
+from .prompts import (
+    QUERY_GENERATOR_AGENT_PROMPT,
+    RUN_DATABASE_QUERY_AGENT_PROMPT,
+    REVISE_RESULTS_AGENT_PROMPT,
+    WEB_SEARCH_AGENT_PROMPT,
+)
 
-__all__ = ["create_prompt_template", "run_query_prompt_template", "revise_prompt_template", "rag_web_search_prompt_template"]
+__all__ = [
+    "QUERY_GENERATOR_AGENT_PROMPT",
+    "RUN_DATABASE_QUERY_AGENT_PROMPT",
+    "REVISE_RESULTS_AGENT_PROMPT",
+    "WEB_SEARCH_AGENT_PROMPT",
+]

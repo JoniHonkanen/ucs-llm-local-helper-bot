@@ -11,7 +11,7 @@ from langchain_core.messages import (
 )
 from langgraph.graph import END, StateGraph
 from langchain_core.runnables import RunnableConfig
-import json
+from typing import List
 from pprint import pprint
 
 # own imports
@@ -24,6 +24,7 @@ from agents.agents import (
 )
 from llm_models import get_ollama_llm, get_openai_llm
 from utils import format_openai_response, format_ollama_response
+from schemas import ReflectionSchema
 
 
 load_dotenv()
@@ -31,7 +32,6 @@ load_dotenv()
 # Initialize global LLM variable
 # llm can be either Ollama or OpenAI
 llm = get_openai_llm()
-rounds = 0
 
 
 # Initialize database information
@@ -89,29 +89,35 @@ class AgentState(TypedDict):
     # messages: Sequence[BaseMessage] THIS COULD BE BETTER - SO MAYBE CHANGE TO IT
 
 
-workflow = StateGraph(AgentState)
+class GraphState(TypedDict):
+    user_input: str
+    messages: List
+    db_query: str
+    db_results: str
+    db_formatted_results: str
+    db_tables: str
+    iterations: int
+    done: ReflectionSchema
+
+
+# workflow = StateGraph(AgentState)
+workflow = StateGraph(GraphState)
 
 
 # Define node functions
 async def create_query(state):
-    print("\nCREATE QUERY ALKAA")
     return await query_generator_agent(state, tables, table_descriptions, llm)
 
 
 async def run_query(state):
-    print("\nRUN QUERY ALKAA")
     return await run_query_agent(state, table_descriptions, llm)
 
 
 async def revise(state):
-    print("\nREVISE ALKAA")
-    global rounds
-    rounds += 1
     return await revise_results_agent(state, llm)
 
 
 async def web_search(state):
-    print("\nWEB SEARCH ALKAA")
     return await web_search_agent(state, llm)
 
 
@@ -128,16 +134,13 @@ workflow.add_edge("web_search", "analyze")
 
 
 def is_done(state):
-    # count_tool_visits = sum(isinstance(item, ToolMessage) for item in state["messages"])
-    # print("COUNT TOOL VISITS: ", count_tool_visits)
-
-    # Extracting the "done" part from the last message
-    last_message_content = state["messages"][-1].content
-    fulfilled = json.loads(last_message_content)["done"]
-
-    if fulfilled or rounds > 1:
+    # Determ next steps after the first run
+    if state["done"].done:
         return "END"
-    return "web_search"
+    else:
+        if state["iterations"] > 2:
+            return "END"
+        return "web_search"
 
 
 workflow.add_conditional_edges("revise", is_done)
@@ -161,43 +164,18 @@ async def run_convo(message: cl.Message):
     else:
         llm = get_ollama_llm(llm_choice)
 
-    # Initialize the state if not already done
-    if not hasattr(cl.user_session, "state"):
-        cl.user_session.state = AgentState(messages=[])
-
-    # Add the new human message to the state
-    cl.user_session.state["messages"].append(SystemMessage(content=table_descriptions))
-    cl.user_session.state["messages"].append(HumanMessage(content=message.content))
-
-    # inputs = {"messages": [HumanMessage(content=message.content)]}
-
     res = await graph.ainvoke(
-        # inputs,
-        cl.user_session.state,
-        config=RunnableConfig(
-            callbacks=[cl.LangchainCallbackHandler()],
-        ),
-        debug=True,
-        # stream_mode="values"
+        {
+            "messages": [
+                SystemMessage(content=table_descriptions),
+                HumanMessage(content=message.content),
+            ],
+            "user_input": message.content,
+            "iterations": 0,
+        }
     )
-    # res comes after when whole graph is done
-    pprint(res)
 
-    # Last message with formatted response - THIS IS THE MARKDOWN TABLE
-    response_message_markdown = json.loads(res["messages"][-2].content)[
-        "formatted_response"
-    ]
+    response_message_markdown = res["db_formatted_results"]
 
-    # Openai and Ollama have different response formats, so we need to format them differently
-    if llm_choice == "OpenAI":
-        formatted_response = format_openai_response(response_message_markdown)
-    else:
-        formatted_response = format_ollama_response(response_message_markdown)
-
-    await cl.Message(formatted_response).send()
-
-    # reset state
-    global rounds
-    rounds = 0
-    cl.user_session.state = AgentState(messages=[])
+    await cl.Message(response_message_markdown).send()
     print("\nDONE\n\n\n")
