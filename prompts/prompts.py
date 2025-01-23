@@ -1,16 +1,15 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-#TODO: ADD MESSAGEPLACEHOLDERS FOR CHAT HISTORY TO EVERY PROMPT!!!!!
-QUERY_GENERATOR_AGENT_PROMPT = ChatPromptTemplate.from_template(
-    """
-You are an advanced language model with Retrieval-Augmented Generation (RAG) capabilities. 
-Your task is to find products compatible with a specified item identified by an identifier. 
-You have access to various databases, documents, and potentially the internet to complete this task. 
-Follow the instructions carefully and provide detailed and accurate information. 
-You must never mention or include the price in your responses. 
-Your goal is to find the most relevant items.
+QUERY_GENERATOR_AGENT_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """
+You are a database expert with Retrieval-Augmented Generation (RAG) capabilities.
+Your task is to generate the best possible database query using the provided table names and descriptions
+to answer the user's question about finding relevant or compatible products. 
 
-You have access to these postgreSQL database tables:
+You have access to these PostgreSQL database tables:
 {tables}
 
 Table Descriptions:
@@ -20,10 +19,15 @@ User input:
 {user_input}
 
 Task:
-Generate a database query to solve the user question (no case-sensitive). 
-Do not include anything else other than the query (not even the SQL tag).
-Never include the price in your responses. This is important!
-"""
+1. Generate a database query to solve the user's question (no case-sensitive).
+2. Decide whether the generated query is relevant to the user's question. Your answer must be "true" (relevant) or "false" (not relevant). 
+   - If relevant, ensure that the query directly answers the user's question correctly.
+   - If not relevant, explain briefly why it is not appropriate, but return no other information.
+3. IF you generate an SQL query, do not return anything else (not even the SQL tag).
+""",
+        ),
+        MessagesPlaceholder(variable_name="messages"),
+    ]
 )
 
 RUN_DATABASE_QUERY_AGENT_PROMPT = ChatPromptTemplate.from_template(

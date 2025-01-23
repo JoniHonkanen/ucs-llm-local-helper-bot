@@ -38,8 +38,29 @@ async def query_generator_agent(state, tables, table_descriptions, llm):
         tables=tables,
         table_descriptions=table_descriptions,
         user_input=last_message.content,
+        messages=state["messages"],
     )
+    
+    #OBS! HUOM!
+    #we use im prompt MessagesPlaceholder(variable_name="messages") -> so llm know
+    # about the previous messages and can use them in the prompt
+
     data = structured_llm.invoke(prompt)
+
+    if data.is_query_needed == True:
+        state["query_needed"] = True
+    else:
+        state["query_needed"] = False
+        await cl.Message(
+            content="Can you make more specific question about products?"
+        ).send()
+        state["messages"] += [
+            AIMessage(
+                content=f"No database query needed. Can you make more specific question about products?"
+            ),
+        ]
+        return state
+
     query = data.query
     info = data.info
 
@@ -120,14 +141,10 @@ async def web_search_agent(state, llm):
 
     data = structured_llm.invoke(prompt)
 
-    print(data)
-
     web_search_query = data.web_search
     search_tool = TavilySearchResults(max_results=1)
     search_results = search_tool.invoke(web_search_query)
     search_result_content = search_results[0]["content"]
-
-    print(search_result_content)
 
     # TODO: PARANNUKSIA TÄNNE
     # search_result_content KORVAA alkuperäisen kysymyksen, jonka jälkeen luodaan tietokantakysely uudestaan jne.

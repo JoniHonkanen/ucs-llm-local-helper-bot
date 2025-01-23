@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, TypedDict
 from langchain_core.pydantic_v1 import BaseModel, Field, Extra, validator
 
 # Schema - define the structure of the answer to the question
@@ -31,6 +31,9 @@ class CreateDatabaseQuerySchema(BaseModel):
     info: str = Field(description="Why the query was used")
     is_correct: str = Field(
         description="Does this answer the question correctly? Yes/No"
+    )
+    is_query_needed: bool = Field(
+        description="Is a database query needed to answer the question, answer True/False"
     )
 
 
@@ -110,3 +113,13 @@ class WebSearchSchema(BaseModel):
     )
     require_more_info: str = Field("Do you require more information? Yes/No") """
 
+class GraphState(TypedDict):
+    user_input: str
+    messages: List[str]
+    db_query: str
+    db_results: str
+    db_formatted_results: str
+    db_tables: str
+    iterations: int
+    done: ReflectionSchema
+    query_needed: bool

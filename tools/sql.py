@@ -21,7 +21,6 @@ conn = psycopg2.connect(
 # fetch all tables in the database
 def list_tables():
     database_name = database_config["dbname"]
-    print(database_name)
     query = f"""
     SELECT table_name
     FROM  {database_name}.information_schema.tables
