@@ -98,7 +98,6 @@ async def run_query_agent(state, table_descriptions, llm):
         AIMessage(content=f"Results from database: {results}"),
     ]
 
-    await cl.Message(content="Query executed successfully.").send()
     return state
 
 
@@ -109,7 +108,7 @@ async def revise_results_agent(state, llm):
     structured_llm = llm.with_structured_output(ReflectionSchema)
 
     prompt = REVISE_RESULTS_AGENT_PROMPT.format(
-        question=original_question, answer=db_results
+        question=original_question, answer=db_results, messages=state["messages"]
     )
     data = structured_llm.invoke(prompt)
     done = data.done

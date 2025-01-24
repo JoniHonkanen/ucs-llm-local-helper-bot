@@ -187,9 +187,21 @@ async def run_convo(message: cl.Message):
         cl.user_session.set("graph_state", updated_state)
         answer_related_query = updated_state["done"].answer
 
+        print("ALEMPI:")
+        print(answer_related_query)
+
+        print("TÄÄ VIOESTI")
+        print(response_message_markdown)
+
         # Send the response only if it's not None
         await cl.Message(
-            f"{answer_related_query}\n  {response_message_markdown}"
+            f"{answer_related_query}"
+            + (
+                f"\n  {response_message_markdown}"
+                if response_message_markdown
+                and "No results found." not in response_message_markdown
+                else ""
+            )
         ).send()
     else:
         # Do not append or send anything if the response is None

@@ -7,7 +7,7 @@ QUERY_GENERATOR_AGENT_PROMPT = ChatPromptTemplate.from_messages(
             """
 You are a database expert with Retrieval-Augmented Generation (RAG) capabilities.
 Your task is to generate the best possible database query using the provided table names and descriptions
-to answer the user's question about finding relevant or compatible products. 
+to answer the user's question about finding relevant or compatible products.
 
 You have access to these PostgreSQL database tables:
 {tables}
@@ -20,12 +20,19 @@ User input:
 
 Task:
 1. Generate a database query to solve the user's question (no case-sensitive).
+   - Use the query history to refine your query if it helps improve accuracy or relevance.
    - Ensure the query retrieves only the necessary data to answer the question.
-   - Avoid retrieving an excessive number of rows by adding a LIMIT clause where appropriate, or refining the WHERE clause.
-2. Decide whether the generated query is relevant to the user's question. Your answer must be "true" (relevant) or "false" (not relevant). 
+   - Avoid retrieving an excessive number of rows by adding a LIMIT clause where appropriate, or refining the WHERE clause. Don't LIMIT if it's not necessary.
+2. Decide whether the generated query is relevant to the user's question. Your answer must be "true" (relevant) or "false" (not relevant).
    - If relevant, ensure that the query directly answers the user's question correctly.
    - If not relevant, explain briefly why it is not appropriate, but return no other information.
 3. IF you generate an SQL query, do not return anything else (not even the SQL tag).
+
+Example of a complex query combining multiple conditions:
+SELECT *
+FROM fitness_bands
+WHERE TRIM(brand_name) ILIKE 'GARMIN'
+  AND color ILIKE '%green%';
 """,
         ),
         MessagesPlaceholder(variable_name="messages"),
@@ -47,16 +54,30 @@ Here is description of the tables:
 """
 )
 
-REVISE_RESULTS_AGENT_PROMPT = ChatPromptTemplate.from_template(
-    """
-Review the results to ensure they fulfill the required task.
+REVISE_RESULTS_AGENT_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """
+Evaluate the given answer to ensure it fully satisfies the user's original question.
 
 Parameters:
-Original question from user: {question}
-Given answer: {answer}
+- Original question: {question}
+- Given answer: {answer}
 
-Given answer can be a number, list of items or just a string.  
-"""
+Instructions:
+1. Determine if the given answer fulfills the user's original question. 
+2. Provide a reason why the answer fulfills or does not fulfill the question.
+3. Suggest improvements for the query or answer, if necessary.
+4. Identify specific aspects or information that are missing or could be better addressed.
+5. Score the relevance of the given answer on a scale from 0 to 1, where 1 indicates perfect relevance.
+6. Rewrite the answer, ensuring it is concise, polite, and directly addresses the user's question without duplicating information (items will follow separately).
+
+Be thorough and objective in your review.
+""",
+        ),
+        MessagesPlaceholder(variable_name="messages"),
+    ],
 )
 
 WEB_SEARCH_AGENT_PROMPT = ChatPromptTemplate.from_template(

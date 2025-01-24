@@ -83,8 +83,7 @@ class ReflectionSchema(BaseModel):
         description="A score from 0 to 1 indicating the relevance of the answer to the original question"
     )
     answer: str = Field(
-        description="A concise, polite response that directly addresses the client's question using the retrieved database results, without listing any items (items comes after this, and we dont want duplicate information).",
-        default="",
+        description="A concise, polite response that directly answers the client's question based on the retrieved database results. The response should provide meaningful information or a summary but must avoid listing any specific items, as those will be presented separately.",
     )
 
     # Set the optional fields to empty string if the done field is True
