@@ -42,7 +42,7 @@ class AfterQuerySchema(BaseModel):
         description="""
 Your formatted response should include:
 - A clear and concise table displaying key data points
-- Use of markdown or other suitable formatting for readability
+- Use of markdown
 - Use real table names and column names where possible
 
 **Note:** Do not use `\n` within the markdown table, as it breaks the table formatting. Instead, use the pipe `|` symbol to separate columns and create new rows directly.
@@ -82,6 +82,10 @@ class ReflectionSchema(BaseModel):
     relevance: float = Field(
         description="A score from 0 to 1 indicating the relevance of the answer to the original question"
     )
+    answer: str = Field(
+        description="A concise, polite response that directly addresses the client's question using the retrieved database results, without listing any items (items comes after this, and we dont want duplicate information).",
+        default="",
+    )
 
     # Set the optional fields to empty string if the done field is True
     @validator("suggestions", "missing_aspects", pre=True, always=True)
@@ -89,12 +93,13 @@ class ReflectionSchema(BaseModel):
         if values.get("done", False):
             return ""
         return v
-    
+
+
 class WebSearchSchema(BaseModel):
     web_search: str = Field(description="Result of the web search")
-    #search_queries: List[str] = Field(
+    # search_queries: List[str] = Field(
     #    description="1-3 search queries to research information and improve your answer."
-    #)
+    # )
 
 
 # SCHEMAS FROM BELOW NOT USED YET...
@@ -112,6 +117,7 @@ class WebSearchSchema(BaseModel):
         description="The search result for the answer"
     )
     require_more_info: str = Field("Do you require more information? Yes/No") """
+
 
 class GraphState(TypedDict):
     user_input: str

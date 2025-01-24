@@ -1,4 +1,3 @@
-import json
 import chainlit as cl
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, AIMessage
 from langchain_community.tools.tavily_search import TavilySearchResults
@@ -40,9 +39,9 @@ async def query_generator_agent(state, tables, table_descriptions, llm):
         user_input=last_message.content,
         messages=state["messages"],
     )
-    
-    #OBS! HUOM!
-    #we use im prompt MessagesPlaceholder(variable_name="messages") -> so llm know
+
+    # OBS! HUOM!
+    # we use im prompt MessagesPlaceholder(variable_name="messages") -> so llm know
     # about the previous messages and can use them in the prompt
 
     data = structured_llm.invoke(prompt)
@@ -90,7 +89,6 @@ async def run_query_agent(state, table_descriptions, llm):
     prompt = RUN_DATABASE_QUERY_AGENT_PROMPT.format(
         query=query, results=formatted_results, table_descriptions=table_descriptions
     )
-
     data = structured_llm.invoke(prompt)
     formatted_response = data.formatted_response
 

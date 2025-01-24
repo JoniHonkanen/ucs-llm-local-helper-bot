@@ -20,6 +20,8 @@ User input:
 
 Task:
 1. Generate a database query to solve the user's question (no case-sensitive).
+   - Ensure the query retrieves only the necessary data to answer the question.
+   - Avoid retrieving an excessive number of rows by adding a LIMIT clause where appropriate, or refining the WHERE clause.
 2. Decide whether the generated query is relevant to the user's question. Your answer must be "true" (relevant) or "false" (not relevant). 
    - If relevant, ensure that the query directly answers the user's question correctly.
    - If not relevant, explain briefly why it is not appropriate, but return no other information.
